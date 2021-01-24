@@ -1,0 +1,22 @@
+---
+title: "Homework 1"
+author: "Tim Farkas"
+date: "1/23/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+**Problem 16.5**
+
+In a study of intentions to get flu-vaccine shots in an area threatened by an epi- demic, 90 persons were classified into three groups of 30 according to the degree of risk of getting flue. Each group was together when the persons were asked about the likelihood of getting the shots, on a probability scale ranging from 0 to 1.0. Unavoidably, most persons overheard the answers of nearby respondents. An ana- lyst wishes to test whether the mean intent scores are the same for the three risk groups. Consider each assumption for ANOVA model (16.2) and explain whether this assumption is likely to hold in the present situation. Model (16.2)
+
+$$Y{ij} = \mu_i + \epsilon_{ij}$$
+
+Assumptions:
+
+1. Normally distributed error & Y -- violated.
+2. Independent error terms -- violated.
+3. Homogeneity of variance -- potentially violated.
