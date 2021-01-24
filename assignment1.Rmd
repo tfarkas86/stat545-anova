@@ -2,21 +2,54 @@
 title: "Homework 1"
 author: "Tim Farkas"
 date: "1/23/2021"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-**Problem 16.5**
+**Problem 16.5: In a study of intentions to get flu vaccine shots in an area threatened by an epidemic, 90 persons were classified into three groups of 30 according to the degree of risk of getting flu. Each group was together when the persons were asked about the likelihood of getting the shots, on a probability scale ranging from 0 to 1.0. Unavoidably, most persons overheard the answers of nearby respondents. An analyst wishes to test whether the mean intent scores are the same for the three risk groups. Consider each assumption for ANOVA model (16.2) and explain whether this assumption is likely to hold in the present situation. Model (16.2)**
 
-In a study of intentions to get flu-vaccine shots in an area threatened by an epi- demic, 90 persons were classified into three groups of 30 according to the degree of risk of getting flue. Each group was together when the persons were asked about the likelihood of getting the shots, on a probability scale ranging from 0 to 1.0. Unavoidably, most persons overheard the answers of nearby respondents. An ana- lyst wishes to test whether the mean intent scores are the same for the three risk groups. Consider each assumption for ANOVA model (16.2) and explain whether this assumption is likely to hold in the present situation. Model (16.2)
+$$Y_{ij} = \mu_i + \epsilon_{ij}$$
 
-$$Y{ij} = \mu_i + \epsilon_{ij}$$
+*Independent Errors*: Most importantly, the ANOVA model assumes that the error terms for each random variable are independent of one another, both within and between groups. Although this study design should yield between group independence, within group indepence is severely compromised, since the answers of respondants may depend on the answers of any respondants answering before them. I think consequences of this are that 1) the responses $Y_{ij}$ within a group will not have the same expected value, and 2) the variance of responses around the group mean will be reduced.
 
-Assumptions:
+*Homogeneity of Variance*: I do not think the unadvisable grouping of respondants will *necessarily* influence the equality of variances, but it does add a potential source of heterogeneity. In particular, if the degree of non-independence varies with flu risk, then heterogeneity of variance is a likely outcome, since one major effect of non-independence in this case is to reduce variance within groups, as respondants are likely to answer similarly to group peers they overhear. 
 
-1. Normally distributed error & Y -- violated.
-2. Independent error terms -- violated.
-3. Homogeneity of variance -- potentially violated.
+*Normally Distributed Error*: As with homogeneity of variance, I don't think this study design will *necessarily* influence the normality assumption, but it might. Whether it does or not will depend on the empirical reality of psychology specific to this scenario. For example, it might be true in general that people tend to assess risk more conservatively (assigning higher risk) than other people they interact with, if (of course) there are people to interact with. Or this effect might depend on the overall perceived severity of risk to oneself (here, as approximated by the treatment level), which could lead to differently shaped non-normal errors among groups. 
+
+**Problem 16.8: In a study of length of hospital stay (in number of days) of persons in four income groups, the parameters are as follows: **  
+
+$\mu_1 = 5.1, \mu_2 = 6.3, \mu_3 = 7.9, \mu_4 = 9.5, \sigma = 2.8$ 
+
+**Assume that ANOVA model (16.2) is appropriate.**   
+
+**(a) Suppose 100 persons from each income group are randomly selected fro the study. Find E(MSTR) and E(MSE). Is E(MSTR) substantially larger than E(MSE) here? What is the implication of this? **  
+
+**(b) If $\mu_2 = 5.6$ and $\mu_3 = 9.0$, everything else remaining the same, what would E(MSTR) be? Why is E(MSTR) substantially larger here than in part (b) even though the range of the factor level means is the same?**  
+
+a)  
+
+$\begin{aligned}
+\mu_. &= \frac{\sum{n_i\mu_i}}{n_T} = \frac{100\sum{\mu_i}}{400} = \frac{5.1 + 6.3 + 7.9 + 9.5}{4} = 7.2 \\
+E(MSTR) &= \sigma^2 + \frac{\sum{n_i(\mu_i - \mu_.)^2}}{r - 1} \\
+E(MSTR) &= \sigma^2 + \frac{100}{r - 1}
+\left[(\mu_1 -\mu_.)^2 + (\mu_2 -\mu_.)^2 
++ (\mu_3 -\mu_.)^2 + (\mu_4 -\mu_.)^2\right] \\
+E(MSTR) &= 2.8^2 + \frac{100}{3}\left[(5.1 - 7.2)^2 
++ (6.3 - 7.2)^2 + (7.9 - 7.2)^2 + (9.5 - 7.2)^2\right] = 374.51 \\
+E(MSE) &= \sigma^2 = 2.8^2 = 7.84
+ \end{aligned}$
+ 
+Yes, E(MSTR) is much higher than E(MSE). The implication is that the differences among groups is large, relative to the overall variation in the data, indicating samples drawn from fundamentally distinct populations. 
+
+b. If $\mu_2 = 5.6$ and $\mu_3 = 9.0$, E(MSTR) would be 524.51. This is substantially larger than in part (a) because $\mu_2$ and $\mu_3$ are both more different from the mean (which is still 7.2), increasing the overall among group variance. The range of the factor level means will also influence E(MSTR), with a higher range increasing E(MSTR), but E(MSTR) can vary for any given range when there are more than two groups, with the highest value when all level means are clustered evenly across the endpoints.  
+
+**Problem 16.9: A student asks:“Why is the F test for equality of factor level means not a two-tail test since any differences among the factor level means can occur in either direction?” Explain, utilizing the expressions for the expected mean square.**
+
+The reason the F-test is not two-tailed is because $F^*$ is proportional to the expected mean square error of the treatments, which depends on the sum of squared difference between the treatment means and the average of the treatment means (assuming equal sample sizes): $\sum(\mu_i - \mu_.)^2$. Hence, positive and negative errors both *increase* $F^*$ the same amount, so a one-tailed test is appropriate for determining the probability that MSTR is greater than MSE. 
+
+
