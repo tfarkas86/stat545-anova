@@ -44,12 +44,29 @@ E(MSTR) &= 2.8^2 + \frac{100}{3}\left[(5.1 - 7.2)^2
 E(MSE) &= \sigma^2 = 2.8^2 = 7.84
  \end{aligned}$
  
+* see Appendix for code used to generate these values
+ 
 Yes, E(MSTR) is much higher than E(MSE). The implication is that the differences among groups is large, relative to the overall variation in the data, indicating samples drawn from fundamentally distinct populations. 
 
-b. If $\mu_2 = 5.6$ and $\mu_3 = 9.0$, E(MSTR) would be 524.51. This is substantially larger than in part (a) because $\mu_2$ and $\mu_3$ are both more different from the mean (which is still 7.2), increasing the overall among group variance. The range of the factor level means will also influence E(MSTR), with a higher range increasing E(MSTR), but E(MSTR) can vary for any given range when there are more than two groups, with the highest value when all level means are clustered evenly across the endpoints.  
+b. If $\mu_2 = 5.6$ and $\mu_3 = 9.0$, E(MSTR) would be 523.17. This is substantially larger than in part (a) because $\mu_2$ and $\mu_3$ are both more different from the mean, increasing the overall among group variance. The range of the factor level means will also influence E(MSTR), with a higher range increasing E(MSTR), but E(MSTR) can vary for any given range when there are more than two groups, with the highest value when all level means are clustered evenly across the endpoints.  
 
-**Problem 16.9: A student asks:“Why is the F test for equality of factor level means not a two-tail test since any differences among the factor level means can occur in either direction?” Explain, utilizing the expressions for the expected mean square.**
+**Problem 16.9: A student asks: “Why is the F test for equality of factor level means not a two-tail test since any differences among the factor level means can occur in either direction?” Explain, utilizing the expressions for the expected mean square.**
 
 The reason the F-test is not two-tailed is because $F^*$ is proportional to the expected mean square error of the treatments, which depends on the sum of squared difference between the treatment means and the average of the treatment means (assuming equal sample sizes): $\sum(\mu_i - \mu_.)^2$. Hence, positive and negative errors both *increase* $F^*$ the same amount, so a one-tailed test is appropriate for determining the probability that MSTR is greater than MSE. 
+
+**Appendix: Code for Problem 16.8**
+
+```{r, eval = FALSE}
+e_mstr <- function(mu_vec, n_vec, sd) {
+  enns <- if(length(n_vec) == 1) rep(n_vec, length(mu_vec)) else n_vec
+  mu. <- sum(enns * mu_vec) / sum(enns)
+  tr_comp <- sum(enns * (mu_vec - mu.)^2) / (length(mu_vec) - 1)
+  c(e_mse = sd^2, e_mstr = sd^2 + tr_comp)
+} 
+mus_a <- c(5.1, 6.3, 7.9, 9.5)
+mus_b <- c(5.1, 5.6, 9.0, 9.5)
+e_mstr(mu_vec = mus_a, n_vec = 100, sd = 2.8)
+e_mstr(mu_vec = mus_b, n_vec = 100, sd = 2.8)
+```
 
 

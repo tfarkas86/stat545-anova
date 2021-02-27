@@ -1,0 +1,279 @@
+---
+title: "Homework 2"
+author: "Tim Farkas"
+date: "2/14/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+**Problem 17.2** 
+
+a. The student is incorrect about the significance level for constructing the confidence interval. It will be higher than $\alpha = 0.01$, even though the test was conducted with critical values based on $\alpha = 0.01$, because the student used the results to determine which test to conduct, rather than randomly selecting a test, or prespecifying a single test of interest. Hence, the confidence interval will be too narrow and will lead to rejection of the null hypothesis too readily.
+
+b. The student is interested in data snooping, which is fine so long as an approach to multiple testing is used. In this case, the confidence interval should be constructed using Tukey's method for estimation. Using this method, the level of significance is chosen for the family of pairwise comparisons, rather than individual comparisons. Hence, confidence intervals for the difference $D = \mu_5 - \mu_3$ will be conservative, likely wider than they need to be for $\alpha = 0.01$, but certainly not too narrow.
+
+**Problem 17.5**
+
+a.i. For the T multiple in Tukey's method:
+
+$\begin{aligned}
+T &= \frac{1}{\sqrt{2}}q(1 - \alpha; r, n_T - r) \\
+T &= \frac{1}{\sqrt{2}}q(0.90; 6, 54)
+\end{aligned}$
+
+By Table B.9, $q(0.90; 6, 54) \approx 3.32$, Hence
+
+$\begin{aligned}
+T &= \frac{1}{\sqrt{2}}q(0.90; 6, 54) = \frac{3.32}{\sqrt{2}} = \mathbf{2.348}
+\end{aligned}$
+
+a.ii. For the S multiple in Scheffe's method:
+
+$\begin{aligned}
+S^2 &= (r - 1)F(1 - \alpha; r - 1, n_T - r) \\
+S^2 &= 5F(0.90; 5, 54)
+\end{aligned}$
+
+By Table B.4, $F(0.90; 5, 54) \approx 3.14$, Hence
+
+$\begin{aligned}
+S &= \sqrt{5 \times 3.14} = \mathbf{3.962}
+\end{aligned}$
+
+a.iii. For the B multiple in Bonferroni's method:
+
+$\begin{aligned}
+B &= t(1 - \frac{\alpha}{2g}, n_T - r) \\
+B &= t(1 - \frac{0.10}{2 \times (2, 5, 15) }, 54) \\
+\end{aligned}$
+
+By Table B.2, and tuning with `qt()`, $t(1 - \frac{0.10}{2 \times (2, 5, 15) }, 54) \approx \mathbf{(2.004, 2.397, 2.822)}$, for $q$ = 2, 5, and 15, respectively.
+
+The generalization from these results is that if pairwise comparisons are made, Tukey's method gives narrower confidence intervals than the Scheffe method. Because only a subset of all pairwise comparisons are made, Bonferroni's method gives narrower confidence intervals than Tukey when the number of comparisons is small, but Tukey performs better when the number of comparisons is large. Bonferroni performs better than Scheffe under all number of comparisons given here, and likely under all pairwise comparisons as well. 
+
+b. The estimates for contrasts of treatment means is the same as for pairwise comparisons above. Contrasts differ from pairwise comparisons only when groups of treatment means are compared. The reason Scheffe's method yields such narrow confidence intervals is that the all pairwise comparisons is a subset of all contrasts, so the number of tests involved in the family of all contrasts is larger than all pairwise comparisons.
+
+*Problem 17.9**
+
+a. Create a line plot for the data. 
+```{r, message = FALSE}
+library(tidyverse)
+```
+
+```{r, message = FALSE, fig.height = 2}
+# input data
+low = c(7.6, 8.2, 6.8, 5.8, 6.9, 6.6, 6.3, 7.7, 6.0)
+med = c(6.7, 8.1, 9.4, 8.6, 7.8, 7.7, 8.9, 7.9, 8.3, 8.7, 7.1, 8.4)
+high = c(8.5, 9.7, 10.1, 7.8, 9.6, 9.5)
+dd <- tibble(rnd = c(rep("low", length(low)), 
+                     rep("med", length(med)),
+                     rep("high",length(high))), 
+             rnd_lab = c(rep("Low R&D", length(low)), 
+                         rep("Medium R&D", length(med)),
+                         rep("High R&D",length(high))), 
+             prod = c(low, med, high))
+
+dd %>%
+  group_by(rnd, rnd_lab) %>%
+  dplyr::summarize(prod = mean(prod)) %>%
+  ggplot(aes(x = prod, y = 0)) + 
+  geom_point() + 
+  geom_text(aes(label = rnd_lab), vjust = -2) +
+  geom_hline(yintercept = 0) + 
+  xlab("mean productivity improvement") + 
+  theme(axis.ticks.y = element_blank(), 
+        axis.text.y = element_blank(),
+        axis.title.y = element_blank()) + 
+  xlim(6, 10)
+```
+
+The line plot suggests higher levels of R&D lead to higher productivity improvement. 
+
+b. Estimate mean productivity improvement and 95% CI for firms with high R&D. 
+
+\begin{flalign}
+&\overline{Y}_{high} \pm t(1 - \frac{\alpha}{2}, 
+n_T - r)s\{\overline{Y}_{high}\} && \\
+&\overline{Y}_{high} = 9.2 && \\
+&t(0.975, 24) = 2.0639 && \\
+&s^2\{\overline{Y}_{high}\} = \frac{MSE}{n_{high}} = 
+\frac{0.64}{6} = 0.1067 && \\
+&s = \sqrt{0.1067} = 0.3266 && \\
+&9.2 \pm 2.0639 \times .3266 = \mathbf{9.2 \pm 0.67} 
+\end{flalign}
+
+c. Estimate difference and 95% CI between Low and Medium R&D
+
+\begin{flalign}
+&\hat{D} \pm t(1 - \frac{\alpha}{2}, 
+n_T - r)s\{\hat{D}\} && \\
+&\hat{D} = \overline{Y}_{med} - \overline{Y}_{low} = 8.13 - 6.88 = 1.25 && \\
+&t(1 - \frac{\alpha}{2}, n_T - r) = 2.0639 && \\
+&s^2\{\hat{D}\} = MSE\left(\frac{1}{n_{med}} + \frac{1}{n_{low}}\right) = 
+0.64\left(\frac{1}{12} + \frac{1}{9}\right) = 0.1244 && \\
+&s\{\hat{D}\} = \sqrt{0.1244} = 0.3528 && \\
+&\hat{D} \pm 2.0639 \times 0.3528 = 1.25 \pm 0.728 &&
+\end{flalign}
+
+d. Use Tukey to perform all pairwise comparisons at $\alpha = 0.10$:
+
+\begin{flalign}
+&\hat{D} \pm Ts\{\hat{D}\} && \\
+&\hat{D} = \overline{Y}_i - \overline{Y}_j && \\
+&\hat{D}_{12} = 1.25 && \\
+&\hat{D}_{13} = 2.32 && \\
+&\hat{D}_{23} = 1.07 && \\
+&T = \frac{1}{\sqrt{2}}q(0.90; 3, 24) = \frac{3.05}{\sqrt{2}} = 2.16 && \\
+&s\{\hat{D}_{ij}\} = \sqrt{MSE\left(\frac{1}{n_{i}} + \frac{1}{n_{j}}\right)} && \\ 
+&s\{\hat{D}_{12}\} = \sqrt{MSE\left(\frac{1}{n_{1}} + \frac{1}{n_{2}}\right)} = 
+\sqrt{0.64\left(\frac{1}{9} + \frac{1}{12}\right)} = 0.3528 && \\
+&s\{\hat{D}_{13}\} = \sqrt{MSE\left(\frac{1}{n_1} + \frac{1}{n_3}\right)} = 
+\sqrt{0.64\left(\frac{1}{9} + \frac{1}{6}\right)} = 0.4216 && \\
+&s\{\hat{D}_{23}\} = \sqrt{MSE\left(\frac{1}{n_{2}} + \frac{1}{n_{3}}\right)} =
+\sqrt{0.64\left(\frac{1}{12} + \frac{1}{6}\right)} = 0.4 && \\
+&\mathbf{\hat{D}_{12} \pm Ts\{\hat{D}_{12}\} = 1.25 \pm 0.762} && \\
+&\mathbf{\hat{D}_{13} \pm Ts\{\hat{D}_{13}\} = 2.32 \pm 0.912} && \\
+&\mathbf{\hat{D}_{23} \pm Ts\{\hat{D}_{23}\} = 1.07 \pm 0.864} &&
+\end{flalign}
+
+e. Is Tukey the most efficient approach?
+
+Yes, I think it is, because we're actually interested in all three possible pairwise comparisons. Because were interested in pairwise comparisons, not more nuanced contrasts, Tukey will be more efficient than Scheffe. Bonferroni might be more efficient if we were interested *a priori* in one or two comparisons, but since all pairwise comaparisons are desired, Tukey will outperform Bonferroni, too.
+
+```{r, results = FALSE, message = FALSE}
+dd %>%
+  group_by(rnd) %>%
+  summarize(prod = mean(prod)) # mean = 9.2
+
+an1 <- aov(prod ~ rnd, data = dd) 
+summary(an1) # mse = 0.64
+
+dd %>%
+  group_by(rnd) %>%
+  summarize(n()) # n = 6
+
+nrow(dd) # nT = 27
+
+qt(0.975, 24) # 2.0639
+
+TukeyHSD(an1)
+confint(an1)
+
+```
+
+
+**Problem 17.9**
+
+a. Create a line plot for the data. 
+```{r, message = FALSE}
+library(tidyverse)
+```
+
+```{r, message = FALSE, fig.height = 2}
+# input data
+low = c(29, 42, 38, 40, 43, 40, 30, 42)
+med = c(30, 35, 39, 28, 31, 31, 29, 35, 29, 33)
+high = c(26, 32, 21, 20, 23, 22)
+dd <- tibble(fit = c(rep("low", length(low)), 
+                     rep("med", length(med)),
+                     rep("high",length(high))), 
+             fit_lab = c(rep("Low Fitness", length(low)), 
+                         rep("Medium Fitness", length(med)),
+                         rep("High Fitness",length(high))), 
+             days = c(low, med, high))
+
+dd %>%
+  group_by(fit, fit_lab) %>%
+  summarize(days = mean(days)) %>%
+  ggplot(aes(x = days, y = 0)) + 
+  geom_point() + 
+  geom_text(aes(label = fit_lab), vjust = -2) +
+  geom_hline(yintercept = 0) + 
+  xlab("mean days to rehab") + 
+  theme(axis.ticks.y = element_blank(), 
+        axis.text.y = element_blank(),
+        axis.title.y = element_blank()) +
+  xlim(20, 40)
+```
+
+The line plot suggests higher levels of fitness lead to shorter recovery times. 
+
+b. Estimate mean number of days in therapy for persons with average fitness with 99% confidence intervals. 
+
+\begin{flalign}
+&\overline{Y}_{avg} \pm t(1 - \frac{\alpha}{2}, 
+n_T - r)s\{\overline{Y}_{avg}\} && \\
+&\overline{Y}_{avg} = 32 && \\
+&t(0.995, 21) = 2.831 && \\
+&s^2\{\overline{Y}_{avg}\} = \frac{MSE}{n_{avg}} = 
+\frac{19.8}{10} = 1.98 && \\
+&s = \sqrt{0.1067} = 1.41 && \\
+&32 \pm 2.831 \times 1.41 = \mathbf{32 \pm 3.99} 
+\end{flalign}
+
+c. Obtain 95% CI for for $D_1 = \mu_2 - \mu_3$ and $D_2 = \mu_1 - \mu_2$ with Bonferroni method:
+
+\begin{flalign}
+&\hat{L} \pm Bs\{\hat{L}\} && \\
+&\hat{L}_{23} = \overline{Y}_2 - \overline{Y}_3 = 8 && \\
+&\hat{L}_{12} = \overline{Y}_1 - \overline{Y}_2 = 6 && \\
+&s\{\hat{L}\} = \sqrt{MSE\left(\frac{1}{n_i} + \frac{1}{n_j}\right)} && \\
+&s\{\hat{L}_{23}\} = \sqrt{19.8\left(\frac{1}{10} + \frac{1}{6}\right)} = 2.30 && \\
+&s\{\hat{L}_{12}\} = \sqrt{19.8\left(\frac{1}{8} + \frac{1}{10}\right)} = 2.11 && \\
+&B = t(1 - \frac{\alpha}{2g}; n_T - r) = t(1 - \frac{0.05}{2 \times 2}; 21) = 2.414 && \\
+&\mathbf{\hat{L}_{23} \pm Bs\{\hat{L}_{23}\} = 8 \pm 5.55} && \\
+&\mathbf{\hat{L}_{12} \pm Bs\{\hat{L}_{12}\} = 6 \pm 5.09} && \\
+\end{flalign}
+
+These results show that the both the difference between low and medium fitness and the different between medium and high fitness are significantly different from zero at $\alpha = 0.05$, because the confidence intervals neither overlap zero. 
+
+d. The Tukey test is not be more efficient because it ensures an $\alpha = 0.05$ for the entire family of three pairwise comparisons. Bonferroni controls $\alpha$ for two pairwise comparisons, and so is more efficient. 
+
+e. Yes the Bonferroni approach would need to be modified by increasing $g$ from 2 to 3 in order to control $\alpha$ over three pairwise comparisons. The Tukey would not need to be adjusted, because it always controls $\alpha$ for the family of all pairwise comparisons, which in this case is 3 comparisons.
+
+f. Set up a Tukey test. 
+
+\begin{flalign}
+&\hat{D} \pm Ts\{\hat{D}\} && \\
+&\hat{D}_{12} = \overline{Y}_1 - \overline{Y}_2 = 6 && \\
+&\hat{D}_{13} = \overline{Y}_1 - \overline{Y}_3 = 14 && \\
+&\hat{D}_{23} = \overline{Y}_2 - \overline{Y}_3 = 8 && \\
+&s\{\hat{D}_{12}\} = \sqrt{19.8\left(\frac{1}{8} + \frac{1}{10}\right)} = 2.11 && \\
+&s\{\hat{D}_{13}\} = \sqrt{19.8\left(\frac{1}{8} + \frac{1}{6}\right)} = 2.40 && \\
+&s\{\hat{D}_{23}\} = \sqrt{19.8\left(\frac{1}{10} + \frac{1}{6}\right)} = 2.30 && \\
+&T = \frac{1}{\sqrt{2}}q(0.95; 3, 25) = \frac{3.52}{\sqrt{2}} = 2.49 && \\
+&\hat{D}_{12} \pm Ts\{\hat{D}\} = 6 \pm 2.49 \times 2.11 = 6 \pm 5.23 && \\
+&\hat{D}_{13} \pm Ts\{\hat{D}\} = 14 \pm 2.49 \times 2.40 = 14 \pm 5.95 && \\
+&\hat{D}_{12} \pm Ts\{\hat{D}\} = 6 \pm 2.49 \times 2.30 = 8 \pm 5.70 && 
+\end{flalign}
+
+All of the means differ from one another, so each belongs to its own group!
+
+Tukey numbers are slightly different from what's given in `TukeyHSD()` ...
+
+```{r, results = FALSE, message = FALSE}
+dd %>%
+  group_by(fit) %>%
+  summarize(days = mean(days)) # mean = 9.2
+
+an1 <- aov(days ~ fit, data = dd) 
+summary(an1) # mse = 19.8
+
+dd %>%
+  group_by(fit) %>%
+  summarize(n()) # n = 6
+
+nrow(dd) # nT = 27
+
+qt(1 - .05/4, 21) # 2.414
+qtukey(.95, 3, 25) # 3.522
+
+TukeyHSD(an1)
+confint(an1)
+
+```
+
+
