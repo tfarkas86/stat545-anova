@@ -1,0 +1,380 @@
+---
+title: "ANOVA Final Exam"
+author: "Tim Farkas"
+date: "5/12/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE)
+```
+
+```{r data input}
+library(tidyverse)
+library(magrittr)
+library(car)
+dd <- tibble(time = c(61, 56, 66, 57, 62, 56, 60, 59, 
+                      57, 56, 59, 63, 67, 64, 72, 65), 
+             metal = rep(1:2, each = 8), 
+             init = rep(c(5, 10), each = 4, len = 16),
+             press = rep(c(12, 28), each = 2, len = 16)
+) %>%
+  mutate(across(metal:press, as_factor))
+
+```
+
+## Part A
+
+There are multiple ways to interpret the design of this study, but the most appropriate is as a three-factor, or three-way, ANOVA. Under this design, all of the predictors are construed as factors with "low" and "high" levels, even though the `initiator` and `pressure` predictors are quantitative variables. The treatments under this model are the two metals (metal 1 vs. metal 2), two initiator quantities (5 mg vs. 10mg), and two pressures (12 K psi vs. 28 K psi). 
+
+Other interpretaions of this design include: 
+
+1. ANCOVA: Interpreting this design as an analysis of covariance (ANCOVA) could also be appropriate, in which `initiator` and `pressure` would be modeled as continuous variables, rather than factors. However, given that the experiment explicitly indicates the effects of `initiator` and `pressure` are of interest, it's best to consider the design as a three-way ANOVA instead, since a three-way ANOVA is explicitly designed to test for interactions among factors, whereas the ANCOVA model lacks interactions between continuous and categorical predictors. 
+
+2. Multiple Regression: Interpreting this design as a multiple regression, with two continuous and one categorical variables is also possible. Because the continuous variables each have only two levels, analyzing the data in this way leads to no loss of generality in how the continuous variables are modeled -- a three-way ANOVA multiple regression with interactions modeled between all predictors are equivalent. The only difference would be that the scale of estimated effects in the multiple regression would be smaller, since estimates would reflect a one unit change in each predictor (1 mg and 1 K psi, for `initiator` and `pressure` respectively), whereas in the three-way ANOVA they would reflect a 5 mg and 26K psi change. 
+
+3. Generalized Randomized Block Design: We could interpret this as a generalized randomized block design. Under this interpretation, any one or combination of two variables could be construed as constructing the blocks, with two replicates per treatment. Similar to ANCOVA, however, this design is typically used when using blocks to reduce error variance for detection of treatment effects. As the experiment is described, all variables should be construed as predictors of interest, hence a three-way ANOVA is the most appropriate interpretation. In any case, the results of analysis assuming a generalized randomized block design would not differ in any way from the results of analysis assuming a three-way ANOVA.
+
+## Part B
+
+A factor-effects representation of the three-way ANOVA model is:
+
+$$Y_{ijkm} = \mu_{...} + \alpha_i + \beta_j + \gamma_k + 
+(\alpha\beta)_{ij} + (\alpha\gamma)_{ik} + (\beta\gamma)_jk + 
+(\alpha\beta\gamma)_{ijk} + \epsilon_{ijkm}$$
+
+Where:
+
+$\mu_{...}$ is the grand mean of firing times across the whole dataset,  
+$\alpha_i$ are the main effects of metal type,  
+$\beta_j$ are the main effects of initiator,   
+$\gamma_k$ are the main effects of pressure,  
+$(\alpha\beta)_{ij}$ are the two-way interaction effects for metal and initiator,  
+$(\alpha\gamma)_{ik}$ are the two-way interaction effects for metal and pressure,  
+$(\beta\gamma)_{jk}$ are the two-way interaction effects for initiator and pressure,  
+$(\alpha\beta\gamma)_{ijk}$ are the three-way interaction effects among all factors, and  
+$\epsilon_{ijkm}$ are iid random errors, distributed $N(0, \sigma^2)$
+
+```{r fit threeway ANOVA}
+an1 <- lm(time ~ metal * init * press, data = dd)
+#anova(an1)
+```
+
+## Part C
+
+The assumptions of this model are:  
+
+1. the random component is normally distributed,  
+2. the error variance is constant among groups,  
+3. the error terms are independent,  
+4. no important predictors are omitted, and  
+5. there are no outliers
+
+**Normality**: To evaluate the normality of the random component, we construct a normal probability plot of the residuals and calculate the correlation between theoretical and empirical quantiles:  
+
+```{r}
+qq <- qqnorm(an1$residuals, plot.it = FALSE)
+plot(qq,
+     xlab = "Theoretical Quantiles", 
+     ylab = "Sample Quantiles", 
+     main = paste("Normal Probability Plot: \n r =", 
+                  round(cor(qq$x, qq$y), 3)))
+```
+
+The results are exceptionally good, with only slight deviation from normality visible in the tails, as expected, and a correlation between theoretical and empirical quantiles ar $r = 0.991$. We conclude the assumption of normality is well met, and no remediation is required. 
+
+**Homogeneity of variance**: To evaluate the homogeneity of variance among treatments, we construct aligned dot plots of the residuals and perform a modified Levene Test. 
+
+```{r}
+dd %<>%
+  mutate(resid = an1$residuals, 
+         fitted = an1$fitted) 
+dd %>%
+  ggplot() + 
+  geom_point(aes(x = resid, y = 0)) +
+  facet_grid(rows = vars(metal, init, press), scales = "fixed") + 
+  ggtitle("Aligned Dot Plot of Residuals") + 
+  ylab("") + 
+  xlab("Residual") + 
+  theme(axis.text.y = element_blank(), 
+        axis.ticks.y = element_blank(), 
+        plot.title = element_text(hjust = .5)) 
+
+# dd %>%
+#   ggplot() +
+#   geom_point(aes(x = fitted, y = resid)) + 
+#   ggtitle("Residuals vs. Fitted Values") + 
+#   theme(plot.title = element_text(hjust = .5)) + 
+#   xlab("Fitted Values") + 
+#   ylab("Residuals")
+
+bftest <- leveneTest(an1)
+```
+
+The aligned dot plot does show the variance to differ greatly among factor combinations. We conducted a Levene test to formally test for heterogeneity of variance, finding an F-statistic of $3.06 \times 10^{31}$ and a p-value of $p < 2.2 \times 10^{-16}$. Hence we strongly reject the null hypothesis of homogeneous variance among groups. This assumption appears strongly violated. 
+
+**Outliers**: For identifying outliers, visual inspection of the aligned dot plot is useful. Here, we see no obvious cases for which error around the group mean is especially large. To be safe, we perform a formal test of whether the most extreme residual is an outlier using studentized deleted residuals. We find the most extreme residual to have a studentized deleted residual of $t = 1.927$, which is smaller than the critical value of $t^* = 3.31$, hence we conclude there are no influential observations in need of remediation. 
+
+```{r studentized deleted residuals}
+X <- as.matrix(dd %>% 
+                  dplyr::select(metal, init, press) %>%
+                  mutate(across(.fns = as.numeric)))
+hh <- X %*% solve(t(X) %*% X) %*% t(X)
+hh_diag <- diag(hh)
+
+sse <- anova(an1)$'Sum Sq'[length(anova(an1)$'Sum Sq')]
+
+tee <- resid(an1) * sqrt((16 - 3 - 1) / (sse * (1 - hh_diag) - resid(an1)^2))
+teemax <- tee[round(tee, 4) == round(max(abs(tee)), 4)]
+
+tstar <- qt(1 - (.1/(2*16)), 16 - 3 - 1)
+
+```
+
+**Independence and Omitted Variables**: We are unable to check the assumptions of independent errors and omitted variables, since we're not provided with any additional information on other predictors that could be included in the model. In particular, we might expect an effect of sampling order or time on the measurement of firing time, but because we're not offered relevant data, we cannot perform an analysis of where there are any sampling time effects. 
+
+## Part D
+
+```{r Kimball inequality}
+kimball <- -1 * ((-1 * (.1 - 1))^(1/7) - 1)
+fcrit <- qf(1 - kimball, 1, 8 )
+```
+
+We first conduct a test of whether there is a three-way interaction among `metal`, `initiator`, and `pressure`. Here we compare hypotheses:  
+
+$H_0:$ all $(\alpha\beta\gamma)_{ijk} = 0$  
+$H_{\alpha}:$ not all $(\alpha\beta\gamma)_{ijk} = 0$  
+
+The test statistic is:   
+
+$F^* = \frac{MSABC}{MSE} = 0.0183$  
+
+Which is less than the critical value of:   
+
+$F_{crit} = F[0.9, 1, 8] = 3.48$  
+
+Hence, we conclude there is no three-way interaction, and continue to test the three, two-way interactions among the three predictors. Comparing the null hypotheses:    
+
+1. $H_0:$ all $(\alpha\beta)_{ij} = 0$  
+2. $H_0:$ all $(\alpha\gamma)_{ik} = 0$  
+3. $H_0:$ all $(\beta\gamma)_{jk} = 0$  
+
+To their respective alternates:   
+
+1. $H_{\alpha}:$ not all $(\alpha\beta)_{ij} = 0$  
+2. $H_{\alpha}:$ not all $(\alpha\gamma)_{ik} = 0$  
+3. $H_{\alpha}:$ not all $(\beta\gamma)_{jk} = 0$  
+
+The corresponding test statistics are:   
+
+1. $F^* = \frac{MSAB}{MSE} = 5.945$  
+2. $F^* = \frac{MSAC}{MSE} = 0.294$  
+3. $F^* = \frac{MSBC}{MSE} = 0.294$  
+
+Given the same critical value of 3.48, we find only the interaction between `metal` and `initiator` to be significant at $\alpha = 0.10$.   
+
+Because `pressure` is not involved in an important interaction with the two other variables, we proceed to test whether there is a significant main effect of `pressure`. The hypothesis comparison is:    
+
+$H_0: \gamma_1 = \gamma_2 = 0$  
+$H_{\alpha}:$ not all $\gamma_k$ = 0  
+
+The corresponding test statistic is:    
+
+$F^* = \frac{MSC}{MSE} = 0.175$   
+
+With the same critical value of 3.38, we conclude there is no main effect of `pressure` on firing time.
+
+**Note**: If we use the Kimball Inequality to correct all seven possible tests at a family $\alpha = 0.1$, the critical F-value is 9.53, and hence no tests are significant. We proceeded using $\alpha = 0.1$ for each test independently, rather than 0.015 as would be required given the Kimball correction. 
+
+
+Taken together, these results demonstrate that the type of metal and amount of initiator jointly influence the firing time. That is, the effect of the type of metal depends on the amount of initiator and vise versa. To inspect this relationship, we plot means for the four factor combinations of these two factors, averaging over levels of the pressure treatment.   
+
+```{r}
+dd %>% 
+  group_by(metal, init) %>%
+  dplyr::summarize(across(time, mean)) %>%
+  ggplot() +
+  geom_line(aes(x = init, y = time, group = metal, color = metal)) + 
+  ylab("Firing Time") + 
+  xlab("Initiator (mg)")
+```
+
+The plot demonstrates a strong interaction, whereby the 5 mg initiator leads to a much smaller firing time than the 10 mg initiator, but only for metal 2. For metal 1, the pattern is reversed, but the magnitude of difference between initiator masses is much smaller.   
+
+## Part E  
+
+Based on the test in Part D above, our final model excludes the variable `pressure`, for a complete two-way ANOVA including `metal` and `initiator`:
+
+$$Y_{ijm} = \mu_{..} + \alpha_i + \beta_j + 
+(\alpha\beta)_{ij} + \epsilon_{ijm}$$
+Where:
+
+$\mu_{..}$ is the grand mean of firing times across the whole dataset,  
+$\alpha_i$ are the main effects of metal type,  
+$\beta_j$ are the main effects of initiator,   
+$(\alpha\beta)_{ij}$ are the two-way interaction effects for metal and initiator,  
+$\epsilon_{ijm}$ are iid random errors, distributed $N(0, \sigma^2)$
+
+## Part F
+
+We perform pairwise comparisons of the four groups formed by factorial crossing of metal and initiator levels using a Tukey test, correcting for all six pairwise comparisons. We used the Tukey test instead of the less conservative Bonferroni test because we did not have any particular comparisons of interest in mind when conducting analysis. We used the Tukey test rather than the Scheffe test because we're interested only in pairwise comparisons, rather than the more general set of possible contrasts, so Tukey's test is less conservative. 
+
+```{r}
+library(knitr)
+an.final <- aov(time ~ metal * init, data = dd)
+tuk <- TukeyHSD(an.final)
+tuk$`metal:init` %>%
+  as_tibble() %>%
+  mutate("metal A" = c(2, 1, 2, 1, 2, 2), 
+         "initiator A" = c(5, 10, 10, 10, 10, 10), 
+         "metal B" = c(1, 1, 1, 2, 2, 1), 
+         "intitiator B" = c(5, 5, 5, 5, 5, 10), 
+         .before = diff) %>%
+  mutate(across(lwr:last_col(), ~ round(.x, 3))) %>%
+  kable
+```
+
+These results clearly reflect the patterns of the plotted cell means above, which shows that firing times are relatively constant except for the one experimental treatment with metal 2 and 10 mg of initiator, which has especially high firing time. Accordingly, the Tukey test shows all three pairwise comparisons including this treatment (rows 3, 5, and 6) to have significant differences at $\alpha = 0.1$. The interaction is reflected in these results in multiple ways. One way to see the interaction is that there is a significant difference between the two treatments with metal 2 (p = 0.027), but not between the two treatments with metal 1 (p = 0.990). If the goal is to find a combination of metal type, amount of primary initiator, and packing pressure that has the lowest firing time of explosives, then all combinations other than those using metal 2 and 10 mg of initiator appear to be good choices. 
+
+## Code Appendix
+
+### Preliminaries  
+
+Data Input
+```{r, echo = TRUE, eval = FALSE}
+library(tidyverse)
+library(magrittr)
+library(car)
+library(knitr)
+
+# enter the data
+dd <- tibble(time = c(61, 56, 66, 57, 62, 56, 60, 59, 
+                      57, 56, 59, 63, 67, 64, 72, 65), 
+             metal = rep(1:2, each = 8), 
+             init = rep(c(5, 10), each = 4, len = 16),
+             press = rep(c(12, 28), each = 2, len = 16)
+) %>%
+  mutate(across(metal:press, as_factor)) # convert to factors
+
+```
+
+### Part B  
+
+Fit Three-way ANOVA
+```{r, echo = TRUE, eval = FALSE}
+# fit the ANOVA model
+an1 <- lm(time ~ metal * init * press, data = dd)
+anova(an1)
+```
+
+### Part C  
+
+Check Normality
+```{r, eval = FALSE, echo = TRUE}
+qq <- qqnorm(an1$residuals, plot.it = FALSE) # get qq results
+
+# plot it with correlation in title
+plot(qq,
+     xlab = "Theoretical Quantiles", 
+     ylab = "Sample Quantiles", 
+     main = paste("Normal Probability Plot: \n r =", 
+                  round(cor(qq$x, qq$y), 3)))
+```
+
+Check Homogeneity of Variance
+```{r assess homogeneity of variance, echo = TRUE, eval = FALSE}
+# add residuals and fitted values to data
+dd %<>%
+  mutate(resid = an1$residuals, 
+         fitted = an1$fitted) 
+
+# aligned dot plot
+dd %>%
+  ggplot() + 
+  geom_point(aes(x = resid, y = 0)) +
+  facet_grid(rows = vars(metal, init, press), scales = "fixed") + 
+  ggtitle("Aligned Dot Plot of Residuals") + 
+  ylab("") + 
+  xlab("Residual") + 
+  theme(axis.text.y = element_blank(), 
+        axis.ticks.y = element_blank(), 
+        plot.title = element_text(hjust = .5)) 
+
+## decided not to include the plot of residuals vs. fitted values
+
+# dd %>%
+#   ggplot() +
+#   geom_point(aes(x = fitted, y = resid)) + 
+#   ggtitle("Residuals vs. Fitted Values") + 
+#   theme(plot.title = element_text(hjust = .5)) + 
+#   xlab("Fitted Values") + 
+#   ylab("Residuals")
+
+# Levene test
+bftest <- leveneTest(an1)
+```
+
+Check Outliers
+```{r, echo = TRUE, eval = FALSE}
+# get predictor matrix 
+X <- as.matrix(dd %>% 
+                  dplyr::select(metal, init, press) %>%
+                  mutate(across(.fns = as.numeric)))
+
+# get hat matrix and diagonal
+hh <- X %*% solve(t(X) %*% X) %*% t(X)
+hh_diag <- diag(hh)
+
+# extract SSE from fitted ANOVA model
+sse <- anova(an1)$'Sum Sq'[length(anova(an1)$'Sum Sq')]
+
+# calculate studentized deleted residuals
+tee <- resid(an1) * sqrt((16 - 3 - 1) / (sse * (1 - hh_diag) - resid(an1)^2))
+
+# get largest residual = 1.927
+teemax <- tee[round(tee, 4) == round(max(abs(tee)), 4)]
+
+# calculate critical t-value = 3.31
+tstar <- qt(1 - (.1/(2*16)), 16 - 3 - 1) 
+```
+
+### Part D  
+ 
+Kimball Inequality
+```{r, eval = FALSE, echo = TRUE}
+kimball <- -1 * ((-1 * (.1 - 1))^(1/7) - 1)
+fcrit <- qf(1 - kimball, 1, 8 ) # 9.53
+```
+
+Plot Means
+```{r, echo = TRUE, eval = FALSE}
+dd %>% 
+  group_by(metal, init) %>%
+  dplyr::summarize(across(time, mean)) %>%
+  ggplot() +
+  geom_line(aes(x = init, y = time, group = metal, color = metal)) + 
+  ylab("Firing Time") + 
+  xlab("Initiator (mg)")
+```
+ 
+### Part F  
+
+Tukey Test
+```{r, echo = TRUE, eval = FALSE}
+# refit reduced model with aov
+an.final <- aov(time ~ metal * init, data = dd)
+
+# perform Tukey test
+tuk <- TukeyHSD(an.final)
+
+# put results of Tukey in table
+tuk$`metal:init` %>%
+  as_tibble() %>%
+  mutate("metal A" = c(2, 1, 2, 1, 2, 2), 
+         "initiator A" = c(5, 10, 10, 10, 10, 10), 
+         "metal B" = c(1, 1, 1, 2, 2, 1), 
+         "intitiator B" = c(5, 5, 5, 5, 5, 10), 
+         .before = diff) %>%
+  mutate(across(lwr:last_col(), ~ round(.x, 3))) %>%
+  kable
+```

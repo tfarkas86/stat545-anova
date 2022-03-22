@@ -1,0 +1,468 @@
+---
+title: "ANOVA Assignment 3"
+author: "Tim Farkas"
+date: "3/3/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE)
+setwd("~/Dropbox/3_Education/Courses/stat_545_anova/code/")
+library(tidyverse)
+library(magrittr)
+library(car)
+library(MASS)
+```
+
+# Problem 18.15
+```{r}
+# import helicopter data
+hd <- read_table("../helicopter.txt", 
+                 col_names = c("freq", "shift", "day"),
+                 col_types = c(freq="d", shift="f", day="i"))
+
+fit <- aov(freq ~ shift, data = hd)
+
+fitted_values <- hd %>%
+  group_by(shift) %>%
+  summarize(shift_mean = mean(freq))
+```
+
+## a.  
+
+```{r}
+cat("Fitted Values: ")
+cat(paste0("Shift_", 1:4, ": ", round(fitted_values$shift_mean, 1)))
+cat("Residuals")
+print(round(resid(fit), 1))
+```
+
+## b.  
+```{r}
+hd %<>%
+  bind_cols(fits = fitted(fit), 
+            residuals = resid(fit)) 
+hd %>%
+  ggplot() +
+  geom_point(aes(fits, residuals))
+```
+
+The plot of fitted values vs residuals does make it look as though there is some heterogeneity of variance. There's appears to be a positive relationship between the magnitude of fitted values and residual variance. 
+
+## c.  
+
+```{r}
+# calculate absolute deviations
+hd <- hd %>%
+  ungroup() %>%
+  group_by(shift) %>%
+  mutate(meds = median(freq)) %>%
+  ungroup() %>%
+  mutate(devs = abs(freq - meds)) %>%
+  ungroup()
+
+# Brown-Forsythe Test via ANOVA
+cat("Brown-Forsythe Test \n")
+summary(aov(devs ~ shift, data = hd))
+```
+
+The Brown-Forsythe (Modified Levene) Test shows the the residual variances do not differ among treatments at $\alpha = 0.10$. The p-value is 0.174. Although I might have concluded heterogeneity of variance based on the figure alone, the results here are somewhat consistent, given that the p-value is 0.174, and not something larger.
+
+## e.  
+
+```{r}
+# box-cox
+boxcox(hd$freq + 1 ~ hd$shift, lambda = seq(-3, 3, by = .5))
+```
+
+Using the Box-Cox procedure, the square-root transformation looks just fine. The maximum likelihood for a power transformation is probably higher than 0.5, but only just barely, and clearly less than 1. For simplicity's sake, let's use 0.5. 
+
+# Problem 18.16  
+
+```{r}
+hd %<>% 
+  dplyr::select(c(freq, shift)) %>%
+  mutate(freq.sqrt = sqrt(freq))
+fitsqrt <- aov(freq.sqrt ~ shift, data = hd)
+
+sqrt_fits <- hd %>%
+  ungroup() %>%
+  group_by(shift) %>%
+  summarize(sqrt_shift_mean = mean(freq.sqrt))
+#fitted(fitsqrt)
+#resid(fitsqrt)
+
+cat("Fitted Values: ")
+cat(paste0("Shift_", 1:4, ": ", round(sqrt_fits$sqrt_shift_mean, 1)))
+cat("Residuals")
+print(round(resid(fitsqrt), 1))
+
+hd %<>%
+  group_by(shift) %>%
+  mutate(fitted = mean(freq.sqrt)) %>%
+  ungroup() %>%
+  mutate(resid = freq.sqrt - fitted)
+```
+## b.  
+
+```{r}
+
+hd %>%
+  ggplot() +
+  geom_point(aes(x = fitted, y = resid))
+
+qq <- qqnorm(hd$resid)
+cat(paste("The correlation coefficient for theoretical and sample quantiles for the residuals is: ", round(cor(qq$x, qq$y), 3)))
+```
+The square root transformation seems to have reduced heterogeneity of variance, though it may not have been a major problem to begin with. The normal quantile plot shows the residuals to be mostly normally distributed. 
+
+## c.  
+
+```{r}
+leveneTest(freq.sqrt ~ shift, data = hd, alpha = 0.1)
+```
+
+The Brown-Forsythe test shows a reduced heterogeneity of variance. It's even less significant, at $\alpha = 0.10$ with a p-value of 0.7632. The findings are consistend in that the graph shows reduced heteroscedasticity, and the Brown-Forsythe test also shows a larger p-value. 
+
+# Problem 19.4
+## a.  
+
+```{r, echo=FALSE}
+dd <- matrix(c(34, 40, 23, 29, 36, 42), nrow = 2)
+rownames(dd) <- c("A1", "A2")
+colnames(dd) <- c("B1", "B2", "B3")
+{
+cat("The Factor A means are: \n")
+rowMeans(dd)
+}
+```
+## b.  
+
+```{r}
+{
+cat("The main effects for Factor A are: \n")
+rowMeans(dd) - mean(dd)
+}
+```
+
+No this does not mean that Factors A and B interact. These are two pairwise differences between levels of Factor B, but for the same level of Factor A. To demonstrate an interaction, there must be the difference between two levels of B must differ across levels of A, which is not the case with these data. 
+
+## c.  
+
+```{r}
+tibble(y = c(dd), 
+       a = as.factor(rep(1:2, times = 3)), 
+       b = as.factor(rep(1:3, each = 2))) %>%
+  ggplot() +
+  geom_line(aes(x = a, y = y, color = b, group = b)) + 
+  geom_point(aes(x = a, y = y))
+```
+
+These are perfectly parallel lines. There appears to be effects of both Factor A and Factor B, but because the lines are perfectly parallel, there is no interaction at all. 
+
+# Problem 19.7  
+
+$E(MSE) = \sigma^2$ = 1.4
+$E(MSA) = \sigma^2 + nb\frac{\sum{(\mu_{i.} - \mu_{..})^2}}{a - 1} = 1.4 + 10(3)\frac{-3^2 + 3^2 = 18}{2-1 = 1} = 541.4$
+
+Yes E(MSA) is substantially larger than E(MSE), which indicates a significant influence of Factor A. 
+
+# Problem 19.14  
+
+```{r}
+dd <- read_table("../hayfever.txt", 
+                 col_names = c("hours", "a", "b", "rep"), 
+                 col_types = c(hours = "d", a = "f", b = "f")) %>%
+  dplyr::select(-rep)
+
+fit <- aov(hours ~ a + b + a*b, data = dd)
+```
+## a.  
+
+```{r}
+{
+cat("The fitted values are:\n")
+fitted(fit)
+}
+```
+## b.  
+
+```{r}
+{
+cat("The residuals are:\n")
+round(resid(fit), 3)
+}
+```
+## c. 
+
+```{r}
+dd %<>%
+  group_by(a, b) %>%
+  mutate(fitted = mean(hours)) %>%
+  ungroup() %>%
+  mutate(resid = hours - fitted)
+
+dd %>%
+  ggplot() + 
+  geom_point(aes(fitted, resid))
+
+```
+
+From this plot it doesn't really look like there is much heterogeneity of variance, though the groups with smallest and largest fitted values seem to have smaller variance than the others. 
+
+## d.  
+
+```{r}
+qq <- qqnorm(dd$resid)
+cor(qq$x, qq$y)
+```
+
+I've never seen such a strong correlation in a QQ plot. The assumption of normality is very, very good.    
+
+# Problem 19.15  
+
+```{r}
+dd %>%
+  group_by(a, b) %>%
+  summarize(across(hours, ~ mean(.x))) %>%
+  ggplot() +
+  geom_line(aes(y = hours, x = a, group = b, color = b))
+```
+## a.  
+
+The question of whether there are factor effects is somewhat complicated by the clear interaction between factors. The effects of Factor A and Factor B appear both present when looking only at the first and second levels of factor b, but the factors interact when including the third level of B, for which there is no difference from level 2 when focused on levels 1 and 2 of factor A, but a clear difference when focused on level 3 of factor A. 
+
+```{r}
+summary(aov(hours ~ a + b + a*b, data = dd))
+```
+
+## b.   
+ 
+This ANOVA table shows that the differences among levels of Factor A account for the most variation, differences among levels of Factor B the second most, and the interaction accounts for the third most. I wouldn't say any one of these overwhelms any other, although the variation explained by Factor A is substantially more than the interaction. 
+
+## c.  
+
+The alternative hypotheses are:
+
+$$H_0: \beta_3 = 0$$
+$$H_{\alpha}: \beta_3 \ne 0$$
+
+The ANOVA table shows a highly significant interaction at $\alpha = 0.05$, with a p-value of 1.0 x 10^-7.
+
+## d.  
+
+```{r}
+summary(aov(hours ~ a*b, data = dd))
+```
+
+
+The hypotheses for Factor A are: 
+
+$$H_0: \mu_{1.} = \mu_{2.} = \mu_{3.}$$
+$$H_{\alpha} = otherwise$$
+For Factor B: 
+
+$$H_0: \mu_{.1} = \mu{.2} = \mu{.3}$$
+$$H_{\alpha} = otherwise$$
+The decision rule for Factor A is: 
+
+$$F^* = \frac{MSA}{MSE} = \frac{110.01}{.06} = 1827.9 \ge F[0.95, 2, 27] = 3.35$$ 
+
+The decision rule for Factor A is: 
+
+$$F^* = \frac{MSB}{MSE} = \frac{61.83}{.06} = 1027.3 \ge F[0.95, 2, 27] = 3.35$$ 
+
+Both main effects are significant a $\alpha = 0.05$ for a two-way ANOVA. However, because the interaction between Factor A and Factor B is significant, and likely "important" because its magnitude, reporting these effects is not really advisable. Instead, the details of the interaction are more valuable as inference about the system if interest.
+
+## d.  
+
+Kimbal's Inequality states here that:
+
+$$\alpha \le 1 - (1-\alpha_1)(1-\alpha_2)(1-\alpha_2) = 1 - (0.95)^3 = 0.143$$
+
+0.143 is an upper bound on the family level of significance for tests of the interaction, and both main effects. 
+
+## e.  
+
+The results from c. and d. both make sense based on the finding from th figure in a. The figure shows a clear interaction, though not of huge magnitude, whereby a difference between levels 2 and 3 of Factor B manifest for level 3 of Factor A, but not for levels 1 or 2. Furthermore, clear effects of both Factor A and B are present, and largely consistent. The response is larger for level 3 than 2, and for 2 than 1 for Factor A, regardless of Factor B, and the response for level 1 of Factor B is clearly lower than for levels 2 or 3. 
+
+# Appendix  
+
+## Problem 18.15  
+
+```{r input data, echo = TRUE, eval = FALSE}
+# import helicopter data
+hd <- read_table("../helicopter.txt", 
+                 col_names = c("freq", "shift", "day"),
+                 col_types = c(freq="d", shift="f", day="i"))
+
+fit <- aov(freq ~ shift, data = hd)
+
+fitted_values <- hd %>%
+  group_by(shift) %>%
+  summarize(shift_mean = mean(freq))
+
+## a
+cat("Fitted Values: ")
+cat(paste0("Shift_", 1:4, ": ", round(fitted_values$shift_mean, 1)))
+cat("Residuals")
+print(round(resid(fit), 1))
+
+## b
+hd %<>%
+  bind_cols(fits = fitted(fit), 
+            residuals = resid(fit)) 
+hd %>%
+  ggplot() +
+  geom_point(aes(fits, residuals))
+
+## c
+
+# calculate absolute deviations
+hd <- hd %>%
+  ungroup() %>%
+  group_by(shift) %>%
+  mutate(meds = median(freq)) %>%
+  ungroup() %>%
+  mutate(devs = abs(freq - meds)) %>%
+  ungroup()
+
+# Brown-Forsythe Test via ANOVA
+cat("Brown-Forsythe Test \n")
+summary(aov(devs ~ shift, data = hd))
+
+## e. 
+
+# box-cox
+boxcox(hd$freq + 1 ~ hd$shift, lambda = seq(-3, 3, by = .5))
+```
+
+
+# Problem 18.16  
+
+```{r, eval = FALSE, echo = TRUE}
+hd %<>% 
+  dplyr::select(c(freq, shift)) %>%
+  mutate(freq.sqrt = sqrt(freq))
+fitsqrt <- aov(freq.sqrt ~ shift, data = hd)
+
+sqrt_fits <- hd %>%
+  ungroup() %>%
+  group_by(shift) %>%
+  summarize(sqrt_shift_mean = mean(freq.sqrt))
+#fitted(fitsqrt)
+#resid(fitsqrt)
+
+## a. 
+
+cat("Fitted Values: ")
+cat(paste0("Shift_", 1:4, ": ", round(sqrt_fits$sqrt_shift_mean, 1)))
+cat("Residuals")
+print(round(resid(fitsqrt), 1))
+
+hd %<>%
+  group_by(shift) %>%
+  mutate(fitted = mean(freq.sqrt)) %>%
+  ungroup() %>%
+  mutate(resid = freq.sqrt - fitted)
+
+## b. 
+
+hd %>%
+  ggplot() +
+  geom_point(aes(x = fitted, y = resid))
+
+qq <- qqnorm(hd$resid)
+cat(paste("The correlation coefficient for theoretical and sample quantiles for the residuals is: ", round(cor(qq$x, qq$y), 3)))
+
+## c. 
+
+leveneTest(freq.sqrt ~ shift, data = hd, alpha = 0.1)
+```
+
+# Problem 19.4  
+
+```{r, echo=FALSE, eval = FALSE}
+dd <- matrix(c(34, 40, 23, 29, 36, 42), nrow = 2)
+rownames(dd) <- c("A1", "A2")
+colnames(dd) <- c("B1", "B2", "B3")
+
+## a. 
+{
+cat("The Factor A means are: \n")
+rowMeans(dd)
+}
+
+## b. 
+{
+cat("The main effects for Factor A are: \n")
+rowMeans(dd) - mean(dd)
+}
+
+## c. 
+tibble(y = c(dd), 
+       a = as.factor(rep(1:2, times = 3)), 
+       b = as.factor(rep(1:3, each = 2))) %>%
+  ggplot() +
+  geom_line(aes(x = a, y = y, color = b, group = b)) + 
+  geom_point(aes(x = a, y = y))
+```
+
+# Problem 19.14  
+
+```{r, echo = TRUE, eval = FALSE}
+dd <- read_table("../hayfever.txt", 
+                 col_names = c("hours", "a", "b", "rep"), 
+                 col_types = c(hours = "d", a = "f", b = "f")) %>%
+  dplyr::select(-rep)
+
+fit <- aov(hours ~ a + b + a*b, data = dd)
+
+## a. 
+
+{
+cat("The fitted values are:\n")
+fitted(fit)
+}
+
+## b.
+
+{
+cat("The residuals are:\n")
+round(resid(fit), 3)
+}
+
+## c. 
+dd %<>%
+  group_by(a, b) %>%
+  mutate(fitted = mean(hours)) %>%
+  ungroup() %>%
+  mutate(resid = hours - fitted)
+
+dd %>%
+  ggplot() + 
+  geom_point(aes(fitted, resid))
+
+## d. 
+qq <- qqnorm(dd$resid)
+cor(qq$x, qq$y)
+```
+
+# Problem 19.15  
+
+```{r, echo = TRUE, eval = FALSE}
+## a.
+dd %>%
+  group_by(a, b) %>%
+  summarize(across(hours, ~ mean(.x))) %>%
+  ggplot() +
+  geom_line(aes(y = hours, x = a, group = b, color = b))
+
+## b. 
+summary(aov(hours ~ a + b + a*b, data = dd))
+
+##d. 
+summary(aov(hours ~ a*b, data = dd))
+```

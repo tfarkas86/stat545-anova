@@ -1,0 +1,275 @@
+---
+title: "assignment5"
+author: "Tim Farkas"
+date: "4/28/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE )
+setwd("~/Dropbox/3_Education/Courses/stat_545_anova/code/")
+```
+
+```{r}
+library(tidyverse)
+library(magrittr)
+```
+
+
+## Problem 21.5
+
+```{r}
+ad <- read.table("../CH21PR05.txt") %>%
+  set_names(c("proficiency", "block", "method")) %>%
+  mutate(across(block:method, as.factor))
+```
+
+**a. ** The reason to block on time since graduation is to control for the effect of experience on proficiency, and thereby reduce overall variance of the model. This factor is not in itself of interest, but serves to capture obvious drivers of proficiency to improve the power of tests for effects of teaching method.  
+
+```{r}
+# fit the model
+an1 <- lm(proficiency ~ method + block, data = ad)
+
+# print residuals
+cat("The residuals for this model are: \n\n")
+cat(resid(an1))
+
+# plot fitted vs residuals
+ad %<>%
+  mutate(fit = an1$fitted.values, 
+         err = an1$residuals) 
+  
+ad %>%
+  ggplot() +
+  geom_point(aes(x = fit, y = err)) + 
+  ggtitle("Fitted Values vs. Residuals") + 
+  xlab("Fitted") + 
+  ylab("Residuals")
+
+# qq plot
+qq <- qqnorm(ad$err)
+cat(paste("The correlation between theoretical and sample quantiles is: ",
+          round(cor(qq$x, qq$y), 3)))
+```
+
+The plot of fitted values vs. residuals shows no clear patterns. Perhaps variance decreases with increasing fitted values, but this pattern is small. 
+
+The normal quantile plot shows very strong correspondence with the assumption of normally distributed error. A correlation coefficient of 0.984 confirms this visual assessment. 
+
+**c.**
+```{r}
+ad %>%
+  ggplot() +
+  geom_line(aes(x = method, y = proficiency, 
+                group = block, color = block))
+```
+
+Most blocks show very parallel lines and indicate not interaction. However, block 5 breaks this trend rather severely, showing a higher proficiency for method 1 than for 2, whereas all other blocks show a higher proficiency for method 2 than for 1.
+
+**d**
+
+```{r}
+ad_aug <- ad %>%
+  ungroup() %>%
+  group_by(method) %>%
+  mutate(method_means = mean(proficiency)) %>%
+  group_by(block) %>%
+  mutate(block_means = mean(proficiency)) %>%
+  ungroup() %>%
+  mutate(grand_mean = mean(proficiency), 
+         sqerr = (proficiency - method_means - block_means + grand_mean)^2)
+
+# total sum of squares
+ssto <- ad_aug %>%
+  mutate(sqerr = (proficiency - grand_mean)^2) %>%
+  pull(sqerr) %>% sum
+
+## mean squares
+method_means <- ad %>%
+  group_by(method) %>%
+  summarize(across(proficiency, mean)) %>%
+  pull(proficiency)
+
+block_means <- ad %>%
+  group_by(block) %>%
+  summarize(across(proficiency, mean)) %>%
+  pull(proficiency)
+
+grand_mean <- mean(ad$proficiency)
+
+msmethod = length(block_means) * sum((method_means - grand_mean)^2) / 
+  (length(method_means) - 1)
+
+msblock = length(method_means) * sum((block_means - grand_mean)^2) / 
+  (length(block_means) - 1)
+
+msab <- sum(ad_aug$sqerr) / ((length(method_means) - 1) * (length(block_means) - 1))
+
+ssa <- msmethod * (length(method_means) - 1)
+ssb <- msblock * (length(block_means) - 1)
+ssab <- msab * (length(method_means) - 1) * (length(block_means) - 1)
+ssrem <- ssto - ssa - ssb - ssab
+
+sqrtnum <- ad_aug %>%
+  mutate(num = proficiency * (block_means - grand_mean) * (method_means - grand_mean)) %>% 
+  pull(num) %>% sum()
+
+num <- sqrtnum^2
+
+denom  <- sum((block_means - grand_mean)^2) * sum((method_means - grand_mean)^2)
+
+ssabstar <- num/denom
+
+ssrem <- ssto - ssabstar - ssa - ssb
+
+fstar <- ssabstar * (30 - 10 - 3) / ssrem
+
+pv <- 1 - pf(fstar, 1, 17)
+```
+
+The Tukey test of additivity test the hypothesis: 
+
+$$H_0: all (\alpha\beta)_{ij} = 0$$
+$$H_{\alpha}: otherwise $$ 
+
+The decision rule is:
+
+$$F* > F(0.99, 1, 17) = 8.40$$
+For the conclusion: 
+
+$$F^* = \frac{SSAB^* \times (ab - a - b)}{SSRem^*} = 0.019$$
+
+So we fail to reject the hypothesis of additivity, and conclude that the randomized complete block design is appropriate, even though the one block shows a different pattern than the others. The p-value for this test is 0.89.
+
+## 27.6
+
+**a**  
+
+```{r}
+anova(an1)
+```
+
+**b** 
+
+For the model: $Y_{ij} = \mu_{..} + \rho_i + \tau_j + \epsilon_{ij}$, where $\rho_i$ are blocks and $\tau_j$ are methods: 
+
+$$H_0: \tau_j = 0, j = 1, 2, 3$$
+$$H_{\alpha}: \tau_j \ne 0$$
+for some j. 
+
+The decision rule is to conclude $H_{\alpha}$ if: 
+
+$$F^* = \frac{MSTR}{MSBL.TR} = \frac{647.5}{6.24} = 103.7 > 3.55 = F[1 - \alpha, r - 1, (n_b - 1)(r-1)]$$
+
+Hence we conclude there is an effect of teaching method. 
+
+```{r}
+TukeyHSD(aov(an1), which = "method")
+```
+
+The Tukey test shows significant differences between all pairwise method comparisons at $\alpha = .90$, with method one leading to the lowest proficiency, method 2 the middle, and method 3 the highest proficiency. 
+
+## Code Appendix
+
+```{r, echo = TRUE, eval = FALSE}
+library(tidyverse)
+library(magrittr)
+
+## Problem 21.5
+
+ad <- read.table("../CH21PR05.txt") %>%
+  set_names(c("proficiency", "block", "method")) %>%
+  mutate(across(block:method, as.factor))
+
+# fit the model
+an1 <- lm(proficiency ~ method + block, data = ad)
+
+# print residuals
+cat("The residuals for this model are: \n\n")
+cat(resid(an1))
+
+# plot fitted vs residuals
+ad %<>%
+  mutate(fit = an1$fitted.values, 
+         err = an1$residuals) 
+  
+ad %>%
+  ggplot() +
+  geom_point(aes(x = fit, y = err)) + 
+  ggtitle("Fitted Values vs. Residuals") + 
+  xlab("Fitted") + 
+  ylab("Residuals")
+
+# qq plot
+qq <- qqnorm(ad$err)
+cat(paste("The correlation between theoretical and sample quantiles is: ",
+          round(cor(qq$x, qq$y), 3)))
+
+ad %>%
+  ggplot() +
+  geom_line(aes(x = method, y = proficiency, 
+                group = block, color = block))
+
+# Tukey additivity test
+ad_aug <- ad %>%
+  ungroup() %>%
+  group_by(method) %>%
+  mutate(method_means = mean(proficiency)) %>%
+  group_by(block) %>%
+  mutate(block_means = mean(proficiency)) %>%
+  ungroup() %>%
+  mutate(grand_mean = mean(proficiency), 
+         sqerr = (proficiency - method_means - block_means + grand_mean)^2)
+
+# total sum of squares
+ssto <- ad_aug %>%
+  mutate(sqerr = (proficiency - grand_mean)^2) %>%
+  pull(sqerr) %>% sum
+
+## mean squares
+method_means <- ad %>%
+  group_by(method) %>%
+  summarize(across(proficiency, mean)) %>%
+  pull(proficiency)
+
+block_means <- ad %>%
+  group_by(block) %>%
+  summarize(across(proficiency, mean)) %>%
+  pull(proficiency)
+
+grand_mean <- mean(ad$proficiency)
+
+msmethod = length(block_means) * sum((method_means - grand_mean)^2) / 
+  (length(method_means) - 1)
+
+msblock = length(method_means) * sum((block_means - grand_mean)^2) / 
+  (length(block_means) - 1)
+
+msab <- sum(ad_aug$sqerr) / ((length(method_means) - 1) * (length(block_means) - 1))
+
+ssa <- msmethod * (length(method_means) - 1)
+ssb <- msblock * (length(block_means) - 1)
+ssab <- msab * (length(method_means) - 1) * (length(block_means) - 1)
+ssrem <- ssto - ssa - ssb - ssab
+
+sqrtnum <- ad_aug %>%
+  mutate(num = proficiency * (block_means - grand_mean) * (method_means - grand_mean)) %>% 
+  pull(num) %>% sum()
+
+num <- sqrtnum^2
+
+denom  <- sum((block_means - grand_mean)^2) * sum((method_means - grand_mean)^2)
+
+ssabstar <- num/denom
+
+ssrem <- ssto - ssabstar - ssa - ssb
+
+fstar <- ssabstar * (30 - 10 - 3) / ssrem
+
+pv <- 1 - pf(fstar, 1, 17)
+
+## 21.6
+
+anova(an1)
+TukeyHSD(aov(an1), which = "method")
+```
